@@ -5,7 +5,7 @@ const fs = require("fs/promises");
 const app = express();
 const apiUrl = "https://ws.hubdodesenvolvedor.com.br/v2/cpf/";
 const situationalApiUrl = "http://34.171.167.8/api/tools/search-cpf/";
-const fixedToken = "132747645BVjxnELSKr239671848";
+const fixedToken = "136292460eVYHwhPyqW246071904";
 
 app.use(express.json());
 
