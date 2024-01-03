@@ -8,7 +8,7 @@ app.use(express.json());
 
 const apiUrl = "http://34.171.167.8/api/tools/search-cpf/";
 const receitaApiUrl = "https://api.infosimples.com/api/v2/consultas/receita-federal/cpf";
-const fixedToken = "d0JhQEgii1_eyW5ON_Hl4B7ElXumDqcVjb0pxdWG";
+const fixedToken = "7_XGwYMZbPqe1aHicRa05jpMvfeMhEoVbp3vaJCd";
 
 app.post("/consulta", async (req, res) => {
   try {
