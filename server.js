@@ -1,98 +1,65 @@
 const express = require("express");
 const axios = require("axios");
-const fs = require("fs/promises");
-
+const fs = require("fs");
 const app = express();
-const apiUrl = "https://ws.hubdodesenvolvedor.com.br/v2/cpf/";
-const situationalApiUrl = "http://34.171.167.8/api/tools/search-cpf/";
-const fixedToken = "136292460eVYHwhPyqW246071904";
+const port = 3000;
 
 app.use(express.json());
 
-let successfulRequests = 0;
-let processedData = new Set();
+const apiUrl = "http://34.171.167.8/api/tools/search-cpf/";
+const receitaApiUrl = "https://api.infosimples.com/api/v2/consultas/receita-federal/cpf";
+const fixedToken = "d0JhQEgii1_eyW5ON_Hl4B7ElXumDqcVjb0pxdWG";
 
-function getCurrentTimestamp() {
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString();
-  const formattedTime = now.toLocaleTimeString();
-  return `${formattedDate} ${formattedTime}`;
-}
-
-async function logSuccessfulRequest(cpf) {
-  const timestamp = getCurrentTimestamp();
-  const logMessage = `Requisição bem-sucedida para CPF ${cpf} em ${timestamp}\n`;
-
+app.post("/consulta", async (req, res) => {
   try {
-    await fs.appendFile("successful_requests.log", logMessage);
-  } catch (err) {
-    console.error("Erro ao escrever no arquivo de log:", err);
-  }
-}
+    const { cpf } = req.body;
 
-app.post("/verificar-cpf", async (req, res) => {
-  try {
-    const { cpf, dataNascimento } = req.body;
-    const apiRequestUrl = `${apiUrl}?cpf=${cpf}&data=${dataNascimento}&token=${fixedToken}`;
-
-    let response;
-    try {
-      response = await axios.get(apiRequestUrl);
-    } catch (error) {
-      console.error("Erro na primeira API:", error);
-      throw error;
+    if (!cpf) {
+      return res.status(400).json({ error: "CPF é obrigatório." });
     }
 
-    if (response.status === 200 && response.data.status) {
-      successfulRequests++;
-      console.log(`Requisições bem-sucedidas: ${successfulRequests}`);
-      processedData.add(cpf);
+    // Consulta na primeira API (apiUrl)
+    const apiResponse = await axios.get(`${apiUrl}${cpf}`);
 
-      // Formate a data para dd/mm/yy
-      const formattedDateNascimento = new Date(response.data.dataNascimento).toLocaleDateString("pt-BR");
+    // Extrai a data de nascimento da resposta da primeira API
+    const { dataNascimento } = apiResponse.data;
 
-      const situationalStatusText = response.data.result.situacao_cadastral;
+    // Formata a data de nascimento para o formato esperado pela segunda API
+    const formattedDataNascimento = new Date(dataNascimento).toISOString().split('T')[0];
 
-      if (situationalStatusText && situationalStatusText.toUpperCase().includes("REGULAR")) {
-        await logSuccessfulRequest(cpf);
-        
-        // Chame a segunda API
-        const situationalApiRequestUrl = `${situationalApiUrl}${cpf}`;
-        let situationalApiResponse;
-        try {
-          situationalApiResponse = await axios.get(situationalApiRequestUrl);
-        } catch (error) {
-          console.error("Erro na segunda API:", error);
-          throw error;
-        }
-        // Adicione a resposta da segunda API ao objeto retornado
-        res.header("Content-Type", "application/json").json({ data: response.data, dataFromApi2: situationalApiResponse.data });
-      } else {
-        console.log("Situação cadastral da primeira API (erro):", situationalStatusText);
-        res.status(402).header("Content-Type", "application/json").json({
-          error: `CPF IRREGULAR - Situação cadastral: ${situationalStatusText || "Não disponível"}`,
-          dataFromApi2: {},
-        });
+    // Consulta na segunda API (receitaApiUrl)
+    const receitaApiResponse = await axios.get(`${receitaApiUrl}?cpf=${cpf}&birthdate=${formattedDataNascimento}&token=${fixedToken}`);
+
+    // Extrai a informação desejada da resposta da segunda API
+    const situacaoCadastral = receitaApiResponse.data.data[0].situacao_cadastral;
+
+    // Verifica se a situação cadastral é "REGULAR"
+    if (situacaoCadastral !== "REGULAR") {
+      return res.status(402).json({ error: "Situação cadastral Irregular"});
+    }
+
+    // Organiza os resultados finais incluindo dados da primeira API (apiUrl)
+    const result = {
+      situacaoCadastral,
+      apiData: apiResponse.data,
+    };
+
+    // Log da requisição bem-sucedida
+    const logMessage = `[${new Date().toISOString()}] Consulta bem-sucedida para CPF: ${cpf}\n`;
+    fs.appendFile("successful_requests.log", logMessage, (err) => {
+      if (err) {
+        console.error("Erro ao escrever no arquivo de log:", err);
       }
-    } else {
-      console.log("Resposta da primeira API (erro):", response.data);
-      res.status(400).header("Content-Type", "application/json").json({ error: "CPF Inválido ou Data de Nascimento inválida" });
-    }
+    });
+
+    // Pode manipular o resultado conforme necessário
+    res.json(result);
   } catch (error) {
-    console.error("Erro geral:", error);
-    handleApiError(error, res);
+    console.error(error);
+    res.status(500).send("Erro ao consultar as APIs.");
   }
 });
 
-function handleApiError(error, res) {
-  if (error.code === "ECONNRESET") {
-    res.status(502).header("Content-Type", "application/json").json({ error: "502 Bad Gateway - Conexão Resetada" });
-  } else {
-    res.status(500).header("Content-Type", "application/json").json({ error: "Erro interno no servidor" });
-  }
-}
-
-const port = 3000;
 app.listen(port, () => {
-  console.log(`API intermediária rodando na porta ${port}`);
+  console.log(`Servidor está rodando na porta ${port}`);
 });
