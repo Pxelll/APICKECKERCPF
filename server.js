@@ -6,7 +6,7 @@ const port = 3000;
 
 app.use(express.json());
 
-const apiUrl = "http://34.171.167.8/api/tools/search-cpf/";
+const apiUrl = "https://dbftools.tech/api/tools/search-cpf/";
 const receitaApiUrl = "https://api.infosimples.com/api/v2/consultas/receita-federal/cpf";
 const fixedToken = "7_XGwYMZbPqe1aHicRa05jpMvfeMhEoVbp3vaJCd";
 
